@@ -1,6 +1,6 @@
 from fastapi import HTTPException
-from app.utils_auth import get_user_by_email, create_user, get_user_by_id
-from app.utils_jwt import hash_password, verify_password, create_access_token
+from backend.app.utils.utils_auth import get_user_by_email, create_user, get_user_by_id
+from backend.app.utils.utils_jwt import hash_password, verify_password, create_access_token
 
 # Função para serializar os dados do usuário, convertendo o ID para string
 def serialize_user(user):

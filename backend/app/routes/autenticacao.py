@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Header, HTTPException
 from app.schemas.autenticacao import RegisterSchema, LoginSchema
 from app.autenticacao import register_user, login_user
-from app.utils_jwt import decode_access_token
-from app.utils_auth import get_user_by_id
+from backend.app.utils.utils_jwt import decode_access_token
+from backend.app.utils.utils_auth import get_user_by_id
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
