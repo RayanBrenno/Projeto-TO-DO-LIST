@@ -32,39 +32,36 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 opacity-10 blur-3xl rounded-full"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-slate-500 opacity-10 blur-3xl rounded-full"></div>
-      </div>
-
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-500 to-blue-700 flex items-center justify-center px-4">
       <div className="relative w-full max-w-md">
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-8">
-          <div className="flex items-center justify-center mb-8">
-            <div className="p-3 bg-blue-500/20 rounded-lg">
-              <LogIn className="w-7 h-7 text-blue-400" />
+        <div className="bg-white/95 backdrop-blur border border-blue-100 rounded-2xl shadow-xl p-8">
+          {/* Ícone */}
+          <div className="flex items-center justify-center mb-6">
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <LogIn className="w-7 h-7 text-blue-600" />
             </div>
           </div>
 
-          <h1 className="text-3xl font-bold text-white text-center mb-2">
-            Login
+          {/* Título */}
+          <h1 className="text-3xl font-bold text-gray-800 text-center mb-2">
+            Bem-vindo
           </h1>
-          <p className="text-slate-400 text-center text-sm mb-8">
-            Acesse sua conta de análise de crédito
+          <p className="text-gray-500 text-center text-sm mb-8">
+            Acesse sua conta no TaskHub
           </p>
 
-          {/* Exibe uma mensagem de erro se houver um erro de login, com um ícone de alerta e um fundo vermelho suave para destacar a mensagem */}
+          {/* ERRO */}
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-red-300 text-sm">{error}</p>
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-red-600 text-sm">{error}</p>
             </div>
           )}
 
-          {/* Formulário de login com campos para email e senha, e um botão de submit que chama a função handleLogin */}
+          {/* FORM */}
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-white mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email
               </label>
               <input
@@ -73,12 +70,12 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
                 required
-                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Senha
               </label>
               <input
@@ -87,14 +84,14 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white font-semibold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 mt-6"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 mt-4 shadow-md hover:shadow-lg"
             >
               {loading ? (
                 <>
@@ -110,23 +107,21 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Link para a página de registro, com um texto convidativo e um botão estilizado que leva o usuário para a página de criação de conta */}
-          <div className="mt-8 pt-8 border-t border-slate-700">
-            <p className="text-slate-400 text-center text-sm mb-4">
+          {/* REGISTER */}
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <p className="text-gray-500 text-center text-sm mb-4">
               Não tem uma conta?
             </p>
             <Link
               to="/register"
-              className="block w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 px-4 rounded-lg transition-all text-center"
+              className="block w-full border border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold py-3 px-4 rounded-lg transition-all text-center"
             >
               Criar Conta
             </Link>
           </div>
         </div>
 
-        <p className="text-slate-400 text-center text-xs mt-8">
-          Sistema de Análise de Crédito © 2026
-        </p>
+        <p className="text-white/80 text-center text-xs mt-6">TaskHub © 2026</p>
       </div>
     </div>
   );
