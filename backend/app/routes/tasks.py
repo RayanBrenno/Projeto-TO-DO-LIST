@@ -4,7 +4,8 @@ from datetime import datetime
 from app.database import db
 from app.schemas.tasks import TaskCreate
 from app.utils.utils_serializers import serialize_task
-from app.routes.autenticacao import get_current_user
+from app.dependencies.auth import get_current_user
+
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
 @router.post("")
 def create_task(data: TaskCreate, current_user=Depends(get_current_user)):
     now = datetime.utcnow().isoformat()
-    current_user_id = ObjectId(current_user["id"])
+    current_user_id = current_user["_id"]
 
     task = {
         "title": data.title.strip(),
@@ -72,7 +73,7 @@ def create_task(data: TaskCreate, current_user=Depends(get_current_user)):
 
 @router.get("/my")
 def list_my_tasks(current_user=Depends(get_current_user)):
-    user_id = ObjectId(current_user["id"])
+    user_id = current_user["_id"]
 
     tasks = list(
         db.tasks.find({
@@ -91,7 +92,7 @@ def list_organization_tasks(organization_id: str, current_user=Depends(get_curre
     except Exception:
         raise HTTPException(status_code=400, detail="ID da organização inválido")
 
-    user_id = ObjectId(current_user["id"])
+    user_id = current_user["_id"]
 
     membership = db.organization_members.find_one({
         "organization_id": org_id,

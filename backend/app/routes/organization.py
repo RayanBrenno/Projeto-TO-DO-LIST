@@ -4,7 +4,7 @@ from datetime import datetime
 from app.database import db
 from app.schemas.organization import OrganizationCreate
 from app.utils.utils_serializers import serialize_organization, serialize_organization_member
-from app.routes.autenticacao import get_current_user
+from app.dependencies.auth import get_current_user
 
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/organizations", tags=["Organizations"])
 def create_organization(data: OrganizationCreate, current_user=Depends(get_current_user)):
     now = datetime.utcnow().isoformat()
 
-    owner_id = ObjectId(current_user["id"])
+    owner_id = current_user["_id"]
 
     organization = {
         "name": data.name.strip(),
@@ -43,8 +43,7 @@ def create_organization(data: OrganizationCreate, current_user=Depends(get_curre
 
 @router.get("/my")
 def list_my_organizations(current_user=Depends(get_current_user)):
-    user_id = ObjectId(current_user["id"])
-
+    user_id = current_user["_id"]
     relations = list(
         db.organization_members.find({"user_id": user_id})
     )
@@ -75,7 +74,7 @@ def list_organization_members(organization_id: str, current_user=Depends(get_cur
             status_code=404, detail="Organização não encontrada")
 
     # só membros da organização podem listar membros
-    user_id = ObjectId(current_user["id"])
+    user_id = current_user["_id"]    
     membership = db.organization_members.find_one({
         "organization_id": org_id,
         "user_id": user_id
