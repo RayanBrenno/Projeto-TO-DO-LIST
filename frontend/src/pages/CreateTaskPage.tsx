@@ -1,174 +1,259 @@
-import { useEffect, useState } from 'react';
-import { Header } from '../components/Header';
-import { api } from '../services/api';
-import { type Organization } from '../types';
-import { CheckCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { PlusCircle, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
+import { createTask } from "../services/task";
+import { getMyOrganizations } from "../services/organization";
+import type { CreateTaskPayload, Organization, TaskType } from "../types/task";
+
+const initialForm: CreateTaskPayload = {
+  title: "",
+  description: "",
+  due_date: "",
+  type: "personal",
+  organization_id: "",  
+};
 
 export function CreateTaskPage() {
+  const [formData, setFormData] = useState<CreateTaskPayload>(initialForm);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [organizationId, setOrganizationId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [loadingOrganizations, setLoadingOrganizations] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const isOrganizationTask = useMemo(
+    () => formData.type === "organization",
+    [formData.type],
+  );
 
   useEffect(() => {
-    fetchOrganizations();
+    async function loadOrganizations() {
+      try {
+        setLoadingOrganizations(true);
+        const data = await getMyOrganizations();
+        setOrganizations(data);
+      } catch (err: any) {
+        console.error("Erro ao carregar organizações:", err);
+      } finally {
+        setLoadingOrganizations(false);
+      }
+    }
+
+    loadOrganizations();
   }, []);
 
-  async function fetchOrganizations() {
-    try {
-      const response = await api.get('/organizations');
-      setOrganizations(response.data || []);
-    } catch (error) {
-      console.error('Erro ao buscar organizações:', error);
-    }
+  function handleChange<K extends keyof CreateTaskPayload>(
+    field: K,
+    value: CreateTaskPayload[K],
+  ) {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    if (error) setError("");
+    if (success) setSuccess("");
   }
 
-  async function handleCreateTask(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
+    setSuccess("");
 
-    if (!title.trim()) {
-      alert('Por favor, preencha o título');
+    if (!formData.title.trim()) {
+      setError("O título é obrigatório.");
+      return;
+    }
+
+    if (isOrganizationTask && !formData.organization_id) {
+      setError("Selecione uma organização para criar a tarefa organizacional.");
       return;
     }
 
     try {
-      setLoading(true);
+      setSubmitting(true);
 
-      await api.post('/tasks', {
-        title: title.trim(),
-        description: description.trim(),
-        organization_id: organizationId,
-        status: 'to_do',
-        due_date: dueDate || null,
-      });
+      const payload: CreateTaskPayload = {
+        title: formData.title.trim(),
+        description: formData.description?.trim() || undefined,
+        due_date: formData.due_date || undefined,
+        type: formData.type,
+        organization_id: isOrganizationTask
+          ? formData.organization_id
+          : undefined,
+      };
 
-      setSuccess(true);
-      setTitle('');
-      setDescription('');
-      setDueDate('');
-      setOrganizationId(null);
+      await createTask(payload);
 
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
-      console.error('Erro ao criar tarefa:', error);
-      alert('Erro ao criar tarefa');
+      setSuccess("Tarefa criada com sucesso.");
+      setFormData(initialForm);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Erro ao criar tarefa.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
-  const minDate = new Date().toISOString().split('T')[0];
-
   return (
-    <>
-      <Header title="Criar Tarefa" subtitle="Adicione uma nova tarefa ao seu sistema" />
-      <div className="p-8">
-        <div className="max-w-2xl mx-auto">
-          {success && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-              <CheckCircle size={24} className="text-green-600" />
-              <div>
-                <p className="font-semibold text-green-900">Tarefa criada com sucesso!</p>
-                <p className="text-green-700 text-sm">
-                  Sua tarefa foi adicionada ao sistema
-                </p>
-              </div>
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-slate-800">Criar Tarefa</h1>
+          <p className="text-slate-500 mt-1">
+            Cadastre uma nova tarefa pessoal ou vinculada a uma organização.
+          </p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-3 bg-blue-100 rounded-xl">
+              <PlusCircle className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800">
+                Nova tarefa
+              </h2>
+              <p className="text-sm text-slate-500">
+                Preencha os dados abaixo para criar a tarefa.
+              </p>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleCreateTask} className="space-y-6">
+          {success && (
+            <div className="mb-5 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-green-700">{success}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Título da Tarefa *
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Título
               </label>
               <input
                 type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Implementar autenticação"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                disabled={loading}
+                value={formData.title}
+                onChange={(e) => handleChange("title", e.target.value)}
+                placeholder="Ex: Revisar documentação da sprint"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Descrição
               </label>
               <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descreva os detalhes da tarefa..."
-                rows={5}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
-                disabled={loading}
+                value={formData.description || ""}
+                onChange={(e) => handleChange("description", e.target.value)}
+                placeholder="Detalhes da tarefa"
+                rows={4}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all resize-none"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Data de Prazo
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Prazo
                 </label>
                 <input
                   type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  min={minDate}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  disabled={loading}
+                  value={formData.due_date || ""}
+                  onChange={(e) => handleChange("due_date", e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all" required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Tipo da tarefa
+                </label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => {
+                    const value = e.target.value as TaskType;
+                    setFormData((prev) => ({
+                      ...prev,
+                      type: value,
+                      organization_id:
+                        value === "organization" ? prev.organization_id : "",
+                    }));
+                    if (error) setError("");
+                    if (success) setSuccess("");
+                  }}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                >
+                  <option value="personal">Pessoal</option>
+                  <option value="organization">Organização</option>
+                </select>
+              </div>
+            </div>
+
+            {isOrganizationTask && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Organização
                 </label>
                 <select
-                  value={organizationId || ''}
-                  onChange={(e) => setOrganizationId(e.target.value || null)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  disabled={loading}
+                  value={formData.organization_id || ""}
+                  onChange={(e) =>
+                    handleChange("organization_id", e.target.value)
+                  }
+                  disabled={loadingOrganizations}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-60"
                 >
-                  <option value="">Pessoal</option>
+                  <option value="">
+                    {loadingOrganizations
+                      ? "Carregando organizações..."
+                      : "Selecione uma organização"}
+                  </option>
+
                   {organizations.map((org) => (
                     <option key={org.id} value={org.id}>
                       {org.name}
                     </option>
                   ))}
                 </select>
-              </div>
-            </div>
 
-            <div className="flex gap-4">
+                {!loadingOrganizations && organizations.length === 0 && (
+                  <p className="text-sm text-amber-600 mt-2">
+                    Você ainda não participa de nenhuma organização.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="pt-2">
               <button
                 type="submit"
-                disabled={loading}
-                className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={submitting}
+                className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-sm hover:shadow-md"
               >
-                {loading ? 'Criando...' : 'Criar Tarefa'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setTitle('');
-                  setDescription('');
-                  setDueDate('');
-                  setOrganizationId(null);
-                }}
-                disabled={loading}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Limpar
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Criando...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="w-5 h-5" />
+                    Criar tarefa
+                  </> 
+                )}
               </button>
             </div>
           </form>
         </div>
       </div>
-    </>
+    </div>
   );
 }
