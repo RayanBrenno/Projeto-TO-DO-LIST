@@ -4,6 +4,7 @@ from typing import Literal
 
 class OrganizationCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
+    description: str = Field(None, max_length=500)
 
 
 class InviteMemberRequest(BaseModel):
