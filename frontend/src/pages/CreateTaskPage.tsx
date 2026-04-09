@@ -2,15 +2,25 @@ import { useEffect, useMemo, useState } from "react";
 import { PlusCircle, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import { createTask } from "../services/task";
 import { getMyOrganizations } from "../services/organization";
-import type { CreateTaskPayload, Organization, TaskType } from "../types/task";
+import type { CreateTaskPayload,TaskType } from "../types/task";
+import type { Organization } from "../types/organization";
+
 
 const initialForm: CreateTaskPayload = {
   title: "",
   description: "",
   due_date: "",
   type: "personal",
-  organization_id: "",  
+  organization_id: "",
 };
+
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 export function CreateTaskPage() {
   const [formData, setFormData] = useState<CreateTaskPayload>(initialForm);
@@ -20,10 +30,32 @@ export function CreateTaskPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const today = useMemo(() => getTodayDateString(), []);
+
   const isOrganizationTask = useMemo(
     () => formData.type === "organization",
     [formData.type],
   );
+
+  const isPastDueDate = useMemo(() => {
+    if (!formData.due_date) return false;
+    return formData.due_date < today;
+  }, [formData.due_date, today]);
+
+  const isFormInvalid = useMemo(() => {
+    return (
+      !formData.title.trim() ||
+      !formData.due_date ||
+      isPastDueDate ||
+      (isOrganizationTask && !formData.organization_id)
+    );
+  }, [
+    formData.title,
+    formData.due_date,
+    formData.organization_id,
+    isPastDueDate,
+    isOrganizationTask,
+  ]);
 
   useEffect(() => {
     async function loadOrganizations() {
@@ -59,8 +91,23 @@ export function CreateTaskPage() {
     setError("");
     setSuccess("");
 
-    if (!formData.title.trim()) {
+    const trimmedTitle = formData.title.trim();
+    const dueDate = formData.due_date?.trim();
+
+    if (!trimmedTitle) {
       setError("O título é obrigatório.");
+      return;
+    }
+
+    if (!dueDate) {
+      setError("A data limite é obrigatória.");
+      return;
+    }
+
+    if (dueDate < today) {
+      setError(
+        "A data limite não pode ser anterior à data de criação da tarefa.",
+      );
       return;
     }
 
@@ -73,9 +120,9 @@ export function CreateTaskPage() {
       setSubmitting(true);
 
       const payload: CreateTaskPayload = {
-        title: formData.title.trim(),
+        title: trimmedTitle,
         description: formData.description?.trim() || undefined,
-        due_date: formData.due_date || undefined,
+        due_date: dueDate,
         type: formData.type,
         organization_id: isOrganizationTask
           ? formData.organization_id
@@ -135,7 +182,7 @@ export function CreateTaskPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Título
+                Título *
               </label>
               <input
                 type="text"
@@ -163,14 +210,21 @@ export function CreateTaskPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Prazo
+                  Prazo *
                 </label>
                 <input
                   type="date"
                   value={formData.due_date || ""}
+                  min={today}
                   onChange={(e) => handleChange("due_date", e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all" required
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                  required
                 />
+                {isPastDueDate && (
+                  <p className="text-sm text-red-600 mt-2">
+                    A data limite não pode ser anterior a hoje.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -235,8 +289,8 @@ export function CreateTaskPage() {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={submitting}
-                className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-sm hover:shadow-md"
+                disabled={submitting || isFormInvalid}
+                className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-sm hover:shadow-md"
               >
                 {submitting ? (
                   <>
@@ -247,7 +301,7 @@ export function CreateTaskPage() {
                   <>
                     <PlusCircle className="w-5 h-5" />
                     Criar tarefa
-                  </> 
+                  </>
                 )}
               </button>
             </div>
