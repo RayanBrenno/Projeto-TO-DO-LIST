@@ -1,6 +1,8 @@
 import { Home, CheckSquare, Users, Plus, LogOut } from "lucide-react";
-import { type Page } from "../types";
 import { useAuth } from "../contexts/AuthContext";
+
+type Page = "home" | "my-tasks" | "organization" | "create-task";
+
 
 interface SidebarProps {
   activePage: Page;

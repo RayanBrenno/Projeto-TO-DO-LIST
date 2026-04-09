@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
-import { type Page } from "../types";
+
+type Page = "home" | "my-tasks" | "organization" | "create-task";
 
 export function Layout() {
   const navigate = useNavigate();
