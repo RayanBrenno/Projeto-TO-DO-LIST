@@ -22,3 +22,10 @@ class TaskResponse(BaseModel):
     organization_id: Optional[str] = None
     created_at: str
     updated_at: str
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=2, max_length=150)
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    status: Optional[Literal["to_do", "doing", "done"]] = None
