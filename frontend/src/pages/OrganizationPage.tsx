@@ -83,7 +83,10 @@ export function OrganizationPage() {
 
   return (
     <>
-      <Header title="Organizações" />
+      <Header 
+        title="Organizações" 
+        subtitle="Acesse e administre as organizações das quais você participa."
+      />
 
       <div className="p-6 md:p-8 bg-slate-50 min-h-screen">
         <div className="max-w-5xl mx-auto space-y-5">
