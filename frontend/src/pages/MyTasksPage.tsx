@@ -81,11 +81,6 @@ export function MyTasksPage() {
     return statusClassMap[status];
   }
 
-  const filteredTasks = useMemo(() => {
-    if (statusFilter === "all") return tasks;
-    return tasks.filter((task) => task.status === statusFilter);
-  }, [tasks, statusFilter]);
-
   function sortTasksByPriority(taskList: Task[]) {
     return [...taskList].sort((a, b) => {
       const aDone = a.status === "done";
@@ -107,6 +102,15 @@ export function MyTasksPage() {
       return aTime - bTime;
     });
   }
+
+  const filteredTasks = useMemo(() => {
+    if (statusFilter === "all") return tasks;
+    return tasks.filter((task) => task.status === statusFilter);
+  }, [tasks, statusFilter]);
+
+  const today = useMemo(() => {
+    return new Date().toISOString().split("T")[0];
+  }, []);
 
   const personalTasks = useMemo(() => {
     return sortTasksByPriority(
@@ -136,7 +140,10 @@ export function MyTasksPage() {
   if (loading) {
     return (
       <>
-        <Header title="Minhas Tarefas" />
+        <Header
+          title="Minhas Tarefas"
+          subtitle="Acompanhe o progresso e mantenha suas atividades sob controle."
+        />
         <div className="p-8">
           <p className="text-slate-500">Carregando tarefas...</p>
         </div>
@@ -146,7 +153,10 @@ export function MyTasksPage() {
 
   return (
     <>
-      <Header title="Minhas Tarefas" />
+      <Header
+        title="Minhas Tarefas"
+        subtitle="Acompanhe o progresso e mantenha suas atividades sob controle."
+      />
 
       <div className="p-8 space-y-8">
         <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -202,60 +212,84 @@ export function MyTasksPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {personalTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:shadow-sm"
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <h3 className="text-base font-semibold text-slate-800">
-                        {task.title}
-                      </h3>
+                {personalTasks.map((task) => {
+                  const isUrgent =
+                    task.status !== "done" && task.due_date === today;
 
-                      <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                          task.status,
-                        )}`}
-                      >
-                        {getStatusLabel(task.status)}
-                      </span>
+                  const isOverdue =
+                    task.status !== "done" &&
+                    !!task.due_date &&
+                    task.due_date < today;
+
+                  return (
+                    <div
+                      key={task.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:shadow-sm"
+                    >
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <h3 className="text-base font-semibold text-slate-800">
+                          {task.title}
+                        </h3>
+
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span
+                            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                              task.status,
+                            )}`}
+                          >
+                            {getStatusLabel(task.status)}
+                          </span>
+
+                          {isUrgent && (
+                            <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                              Urgente
+                            </span>
+                          )}
+
+                          {isOverdue && (
+                            <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                              Atrasada
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="mb-4 text-sm leading-6 text-slate-600">
+                        {task.description?.trim()
+                          ? task.description
+                          : "Sem descrição para esta tarefa."}
+                      </p>
+
+                      <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
+                        <CalendarDays size={16} />
+                        <span>{formatDate(task.due_date)}</span>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs font-medium text-slate-500">
+                          Alterar status
+                        </label>
+                        <select
+                          value={task.status}
+                          onChange={(e) =>
+                            handleStatusChange(
+                              task.id,
+                              e.target.value as Task["status"],
+                            )
+                          }
+                          disabled={updatingTaskId === task.id}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {taskStatusOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-
-                    <p className="mb-4 text-sm leading-6 text-slate-600">
-                      {task.description?.trim()
-                        ? task.description
-                        : "Sem descrição para esta tarefa."}
-                    </p>
-
-                    <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
-                      <CalendarDays size={16} />
-                      <span>{formatDate(task.due_date)}</span>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-medium text-slate-500">
-                        Alterar status
-                      </label>
-                      <select
-                        value={task.status}
-                        onChange={(e) =>
-                          handleStatusChange(
-                            task.id,
-                            e.target.value as Task["status"],
-                          )
-                        }
-                        disabled={updatingTaskId === task.id}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {taskStatusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -287,70 +321,94 @@ export function MyTasksPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {organizationTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:shadow-sm"
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <h3 className="text-base font-semibold text-slate-800">
-                        {task.title}
-                      </h3>
+                {organizationTasks.map((task) => {
+                  const isUrgent =
+                    task.status !== "done" && task.due_date === today;
 
-                      <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                          task.status,
-                        )}`}
-                      >
-                        {getStatusLabel(task.status)}
-                      </span>
-                    </div>
+                  const isOverdue =
+                    task.status !== "done" &&
+                    !!task.due_date &&
+                    task.due_date < today;
 
-                    <p className="mb-4 text-sm leading-6 text-slate-600">
-                      {task.description?.trim()
-                        ? task.description
-                        : "Sem descrição para esta tarefa."}
-                    </p>
+                  return (
+                    <div
+                      key={task.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:shadow-sm"
+                    >
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <h3 className="text-base font-semibold text-slate-800">
+                          {task.title}
+                        </h3>
 
-                    <div className="mb-4 space-y-2 text-sm text-slate-500">
-                      <div className="flex items-center gap-2">
-                        <CalendarDays size={16} />
-                        <span>{formatDate(task.due_date)}</span>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span
+                            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                              task.status,
+                            )}`}
+                          >
+                            {getStatusLabel(task.status)}
+                          </span>
+
+                          {isUrgent && (
+                            <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                              Urgente
+                            </span>
+                          )}
+
+                          {isOverdue && (
+                            <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                              Atrasada
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Building2 size={16} />
-                        <span>
-                          {task.organization_name ||
-                            "Organização não informada"}
-                        </span>
+                      <p className="mb-4 text-sm leading-6 text-slate-600">
+                        {task.description?.trim()
+                          ? task.description
+                          : "Sem descrição para esta tarefa."}
+                      </p>
+
+                      <div className="mb-4 space-y-2 text-sm text-slate-500">
+                        <div className="flex items-center gap-2">
+                          <CalendarDays size={16} />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Building2 size={16} />
+                          <span>
+                            {task.organization_name ||
+                              "Organização não informada"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs font-medium text-slate-500">
+                          Alterar status
+                        </label>
+                        <select
+                          value={task.status}
+                          onChange={(e) =>
+                            handleStatusChange(
+                              task.id,
+                              e.target.value as Task["status"],
+                            )
+                          }
+                          disabled={updatingTaskId === task.id}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {taskStatusOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-medium text-slate-500">
-                        Alterar status
-                      </label>
-                      <select
-                        value={task.status}
-                        onChange={(e) =>
-                          handleStatusChange(
-                            task.id,
-                            e.target.value as Task["status"],
-                          )
-                        }
-                        disabled={updatingTaskId === task.id}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {taskStatusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
