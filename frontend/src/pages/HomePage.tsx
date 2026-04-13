@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Header } from "../components/Header";
-import { api } from "../services/api";
+import { getMyTasks, updateTaskStatus } from "../services/task";
+import { getOrganizations } from "../services/organization";
 import { type Organization } from "../types/organization";
 import { type Task } from "../types/task";
 import { Calendar, Building2 } from "lucide-react";
-
 
 export function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -19,13 +19,13 @@ export function HomePage() {
     try {
       setLoading(true);
 
-      const [tasksResponse, organizationsResponse] = await Promise.all([
-        api.get("/tasks/me"),
-        api.get("/organizations"),
+      const [tasks, organizations] = await Promise.all([
+        getMyTasks(),
+        getOrganizations(),
       ]);
 
-      setTasks(tasksResponse.data || []);
-      setOrganizations(organizationsResponse.data || []);
+      setTasks(tasks);
+      setOrganizations(organizations);
     } catch (error) {
       console.error("Erro ao buscar dados da home:", error);
       setTasks([]);
@@ -37,7 +37,7 @@ export function HomePage() {
 
   async function handleStatusChange(taskId: string, status: Task["status"]) {
     try {
-      await api.put(`/tasks/${taskId}`, { status });
+      await updateTaskStatus(taskId, status);
       fetchData();
     } catch (error) {
       console.error("Erro ao atualizar status da tarefa:", error);
@@ -66,8 +66,12 @@ export function HomePage() {
 
   const stats = useMemo(() => {
     const totalTasks = tasks.length;
-    const inProgressTasks = tasks.filter((task) => task.status === "doing").length;
-    const completedTasks = tasks.filter((task) => task.status === "done").length;
+    const inProgressTasks = tasks.filter(
+      (task) => task.status === "doing",
+    ).length;
+    const completedTasks = tasks.filter(
+      (task) => task.status === "done",
+    ).length;
 
     return {
       totalTasks,

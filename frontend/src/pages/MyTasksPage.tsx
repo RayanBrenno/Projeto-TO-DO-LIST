@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Header } from "../components/Header";
-import { api } from "../services/api";
 import { type Task, type TaskStatus } from "../types/task";
 import { CalendarDays, Building2, Filter, ListTodo } from "lucide-react";
+import { getMyTasks, updateTaskStatus } from "../services/task";
 
 type StatusFilter = "all" | "to_do" | "doing" | "done";
 
@@ -31,8 +31,8 @@ export function MyTasksPage() {
   async function fetchTasks() {
     try {
       setLoading(true);
-      const response = await api.get("/tasks/me");
-      setTasks(response.data || []);
+      const tasks = await getMyTasks();
+      setTasks(tasks);
     } catch (error) {
       console.error("Erro ao buscar tarefas:", error);
       setTasks([]);
@@ -45,9 +45,7 @@ export function MyTasksPage() {
     try {
       setUpdatingTaskId(taskId);
 
-      await api.put(`/tasks/${taskId}`, {
-        status: newStatus,
-      });
+      await updateTaskStatus(taskId, newStatus);
 
       setTasks((prevTasks) =>
         prevTasks.map((task) =>

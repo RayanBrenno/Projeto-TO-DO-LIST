@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { Header } from "../components/Header";
-import { api } from "../services/api";
 import { CreateOrganizationAccordion } from "../components/organizations/CreateOrganizationAccordion";
 import { OrganizationListAccordion } from "../components/organizations/OrganizationListAccordion";
-import type {
-  OrganizationWithMembers,
-  OrganizationMember,
-} from "../types/organization";
+import type {OrganizationWithMembers } from "../types/organization";
+import { addOrganizationMember, createOrganization, getOrganizations } from "../services/organization";
+
 
 export function OrganizationPage() {
   const [organizations, setOrganizations] = useState<OrganizationWithMembers[]>(
@@ -24,15 +22,8 @@ export function OrganizationPage() {
       setLoading(true);
       setPageError("");
 
-      const response = await api.get("/organizations");
-      const data = Array.isArray(response.data) ? response.data : [];
-
-      const normalizedData: OrganizationWithMembers[] = data.map((org) => ({
-        ...org,
-        members: Array.isArray(org.members) ? org.members : [],
-      }));
-
-      setOrganizations(normalizedData);
+      const organizations = await getOrganizations();
+      setOrganizations(organizations);
     } catch (error) {
       console.error("Erro ao buscar organizações:", error);
       setPageError("Erro ao carregar organizações.");
@@ -41,33 +32,19 @@ export function OrganizationPage() {
     }
   }
 
-  async function createOrganization(name: string, description: string) {
+  async function handleCreateOrganization(name: string, description: string) {
     const payload = {
       name: name.trim(),
       description: description.trim() || undefined,
     };
 
-    const response = await api.post("/organizations", payload);
-
-    const createdOrg: OrganizationWithMembers = {
-      ...response.data,
-      members: Array.isArray(response.data?.members)
-        ? response.data.members
-        : [],
-    };
+    const createdOrg = await createOrganization(payload);
 
     setOrganizations((prev) => [createdOrg, ...prev]);
   }
 
   async function addMember(orgId: string, email: string) {
-    const response = await api.post(`/organizations/${orgId}/members`, {
-      email,
-    });
-
-    const returnedMember = response.data?.member;
-    const normalizedMember: OrganizationMember = returnedMember?.email
-      ? returnedMember
-      : { email };
+    const normalizedMember = await addOrganizationMember(orgId, email);
 
     setOrganizations((prev) =>
       prev.map((org) =>
@@ -83,8 +60,8 @@ export function OrganizationPage() {
 
   return (
     <>
-      <Header 
-        title="Organizações" 
+      <Header
+        title="Organizações"
         subtitle="Acesse e administre as organizações das quais você participa."
       />
 
@@ -96,7 +73,9 @@ export function OrganizationPage() {
             </div>
           )}
 
-          <CreateOrganizationAccordion onCreateOrganization={createOrganization} />
+          <CreateOrganizationAccordion
+            onCreateOrganization={handleCreateOrganization}
+          />
 
           <OrganizationListAccordion
             organizations={organizations}
