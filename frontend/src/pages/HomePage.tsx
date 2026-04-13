@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Header } from "../components/Header";
-import { TaskCard } from "../components/TaskCard";
 import { api } from "../services/api";
-import { type Task, type Organization } from "../types";
+import { type Organization } from "../types/organization";
+import { type Task } from "../types/task";
+import { Calendar, Building2 } from "lucide-react";
+
 
 export function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -18,20 +20,8 @@ export function HomePage() {
       setLoading(true);
 
       const [tasksResponse, organizationsResponse] = await Promise.all([
-        api.get("/tasks", {
-          params: {
-            limit: 6,
-            order_by: "created_at",
-            order: "desc",
-          },
-        }),
-        api.get("/organizations", {
-          params: {
-            limit: 4,
-            order_by: "created_at",
-            order: "desc",
-          },
-        }),
+        api.get("/tasks/me"),
+        api.get("/organizations"),
       ]);
 
       setTasks(tasksResponse.data || []);
@@ -45,23 +35,68 @@ export function HomePage() {
     }
   }
 
+  async function handleStatusChange(taskId: string, status: Task["status"]) {
+    try {
+      await api.put(`/tasks/${taskId}`, { status });
+      fetchData();
+    } catch (error) {
+      console.error("Erro ao atualizar status da tarefa:", error);
+    }
+  }
+
   const today = new Date().toISOString().split("T")[0];
 
-  const todayTasks = tasks.filter((task) => {
-    if (!task.due_date) return false;
-    return task.due_date === today;
-  });
+  const statusColors = {
+    to_do: "bg-red-100 text-red-800 border-red-300",
+    doing: "bg-yellow-100 text-yellow-800 border-yellow-300",
+    done: "bg-green-100 text-green-800 border-green-300",
+  };
 
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter((task) => task.status === "done").length;
-  const inProgressTasks = tasks.filter((task) => task.status === "doing").length;
+  const statusLabels = {
+    to_do: "A Fazer",
+    doing: "Fazendo",
+    done: "Concluído",
+  };
+
+  const nextStatus: Record<Task["status"], Task["status"]> = {
+    to_do: "doing",
+    doing: "done",
+    done: "to_do",
+  };
+
+  const stats = useMemo(() => {
+    const totalTasks = tasks.length;
+    const inProgressTasks = tasks.filter((task) => task.status === "doing").length;
+    const completedTasks = tasks.filter((task) => task.status === "done").length;
+
+    return {
+      totalTasks,
+      inProgressTasks,
+      completedTasks,
+      totalOrganizations: organizations.length,
+    };
+  }, [tasks, organizations]);
+
+  const urgentTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (!task.due_date) return false;
+      return task.due_date === today && task.status !== "done";
+    });
+  }, [tasks, today]);
+
+  const overdueTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (!task.due_date) return false;
+      return task.due_date < today && task.status !== "done";
+    });
+  }, [tasks, today]);
 
   if (loading) {
     return (
       <>
         <Header
           title="Bem-vindo ao TaskHub"
-          subtitle="Aqui você pode gerenciar todas as suas tarefas"
+          subtitle="Aqui você pode acompanhar seu resumo geral"
         />
         <div className="p-8">
           <p className="text-gray-500">Carregando...</p>
@@ -74,16 +109,18 @@ export function HomePage() {
     <>
       <Header
         title="Bem-vindo ao TaskHub"
-        subtitle="Aqui você pode gerenciar todas as suas tarefas"
+        subtitle="Aqui você pode acompanhar seu resumo geral"
       />
 
       <div className="p-8 space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border border-blue-200">
             <p className="text-blue-600 text-sm font-semibold uppercase tracking-wide">
               Total de Tarefas
             </p>
-            <p className="text-3xl font-bold text-blue-900 mt-2">{totalTasks}</p>
+            <p className="text-3xl font-bold text-blue-900 mt-2">
+              {stats.totalTasks}
+            </p>
           </div>
 
           <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-6 border border-yellow-200">
@@ -91,7 +128,7 @@ export function HomePage() {
               Em Progresso
             </p>
             <p className="text-3xl font-bold text-yellow-900 mt-2">
-              {inProgressTasks}
+              {stats.inProgressTasks}
             </p>
           </div>
 
@@ -100,7 +137,7 @@ export function HomePage() {
               Concluídas
             </p>
             <p className="text-3xl font-bold text-green-900 mt-2">
-              {completedTasks}
+              {stats.completedTasks}
             </p>
           </div>
 
@@ -109,56 +146,146 @@ export function HomePage() {
               Organizações
             </p>
             <p className="text-3xl font-bold text-purple-900 mt-2">
-              {organizations.length}
+              {stats.totalOrganizations}
             </p>
           </div>
         </div>
 
-        {todayTasks.length > 0 && (
+        {urgentTasks.length > 0 && (
           <div>
             <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Tarefas de Hoje
+              Tarefas Urgentes
             </h3>
             <div className="space-y-4">
-              {todayTasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onStatusChange={fetchData}
-                  onDelete={fetchData}
-                />
-              ))}
+              {urgentTasks.map((task) => {
+                const dueDate = task.due_date
+                  ? new Date(task.due_date).toLocaleDateString("pt-BR")
+                  : null;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {task.title}
+                        </h3>
+                        {task.description && (
+                          <p className="text-gray-600 text-sm mt-1 line-clamp-2">
+                            {task.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() =>
+                            handleStatusChange(task.id, nextStatus[task.status])
+                          }
+                          className={`px-3 py-1 rounded-full border font-medium text-sm transition-colors cursor-pointer hover:opacity-80 ${statusColors[task.status]}`}
+                        >
+                          {statusLabels[task.status]}
+                        </button>
+
+                        <span className="px-3 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200 text-sm font-medium">
+                          Urgente
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-sm text-gray-600">
+                        {dueDate && (
+                          <div className="flex items-center gap-2">
+                            <Calendar size={16} className="text-gray-400" />
+                            <span>{dueDate}</span>
+                          </div>
+                        )}
+
+                        {task.organization_name && (
+                          <div className="flex items-center gap-2">
+                            <Building2 size={16} className="text-gray-400" />
+                            <span>{task.organization_name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
-        <div>
-          <h3 className="text-xl font-bold text-gray-900 mb-4">
-            Tarefas Recentes
-          </h3>
-
-          {tasks.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">
-                Nenhuma tarefa criada ainda
-              </p>
-              <p className="text-gray-400 text-sm mt-2">
-                Clique em "Criar Tarefa" para começar
-              </p>
-            </div>
-          ) : (
+        {overdueTasks.length > 0 && (
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              Tarefas Atrasadas
+            </h3>
             <div className="space-y-4">
-              {tasks.slice(0, 6).map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onStatusChange={fetchData}
-                  onDelete={fetchData}
-                />
-              ))}
+              {overdueTasks.map((task) => {
+                const dueDate = task.due_date
+                  ? new Date(task.due_date).toLocaleDateString("pt-BR")
+                  : null;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {task.title}
+                        </h3>
+                        {task.description && (
+                          <p className="text-gray-600 text-sm mt-1 line-clamp-2">
+                            {task.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() =>
+                            handleStatusChange(task.id, nextStatus[task.status])
+                          }
+                          className={`px-3 py-1 rounded-full border font-medium text-sm transition-colors cursor-pointer hover:opacity-80 ${statusColors[task.status]}`}
+                        >
+                          {statusLabels[task.status]}
+                        </button>
+
+                        <span className="px-3 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 text-sm font-medium">
+                          Atrasado
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-sm text-gray-600">
+                        {dueDate && (
+                          <div className="flex items-center gap-2">
+                            <Calendar size={16} className="text-gray-400" />
+                            <span>{dueDate}</span>
+                          </div>
+                        )}
+
+                        {task.organization_name && (
+                          <div className="flex items-center gap-2">
+                            <Building2 size={16} className="text-gray-400" />
+                            <span>{task.organization_name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </>
   );
