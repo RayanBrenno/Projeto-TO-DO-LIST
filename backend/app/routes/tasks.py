@@ -97,24 +97,6 @@ def create_task(data: TaskCreate, current_user=Depends(get_current_user)):
     }
 
 
-@router.get("/my")
-def list_my_tasks(current_user=Depends(get_current_user)):
-    """
-    Mantido por compatibilidade:
-    continua trazendo apenas tarefas pessoais do usuário.
-    """
-    user_id = current_user["_id"]
-
-    tasks = list(
-        db.tasks.find({
-            "type": "personal",
-            "user_id": user_id
-        }).sort("created_at", -1)
-    )
-
-    return [serialize_task_with_organization(task) for task in tasks]
-
-
 @router.get("/me")
 def list_all_my_tasks(current_user=Depends(get_current_user)):
     """
@@ -171,42 +153,6 @@ def list_all_my_tasks(current_user=Depends(get_current_user)):
             task,
             organizations_map.get(task.get("organization_id"))
         )
-        for task in tasks
-    ]
-
-
-@router.get("/organization/{organization_id}")
-def list_organization_tasks(organization_id: str, current_user=Depends(get_current_user)):
-    try:
-        org_id = ObjectId(organization_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID da organização inválido")
-
-    user_id = current_user["_id"]
-
-    membership = db.organization_members.find_one({
-        "organization_id": org_id,
-        "user_id": user_id
-    })
-
-    if not membership:
-        raise HTTPException(
-            status_code=403,
-            detail="Você não participa desta organização"
-        )
-
-    organization = db.organizations.find_one({"_id": org_id})
-    organization_name = organization.get("name") if organization else None
-
-    tasks = list(
-        db.tasks.find({
-            "type": "organization",
-            "organization_id": org_id
-        }).sort("created_at", -1)
-    )
-
-    return [
-        serialize_task_with_organization(task, organization_name)
         for task in tasks
     ]
     
