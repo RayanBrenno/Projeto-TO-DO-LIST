@@ -4,7 +4,7 @@ from bson import ObjectId
 from datetime import datetime
 from app.database import db
 from app.schemas.organization import OrganizationCreate
-from app.utils.utils_serializers import serialize_organization, serialize_organization_member
+from app.utils.utils_serializers import serialize_organization
 from app.dependencies.auth import get_current_user
 
 
@@ -79,19 +79,6 @@ def list_my_organizations(current_user=Depends(get_current_user)):
     for org in organizations:
         owner = db.users.find_one({"_id": org["owner_id"]})
 
-        member_relations = list(
-            db.organization_members.find({"organization_id": org["_id"]})
-        )
-
-        members = []
-        for relation in member_relations:
-            user = db.users.find_one({"_id": relation["user_id"]})
-            if user:
-                members.append({
-                    "id": str(user["_id"]),
-                    "email": user.get("email"),
-                })
-
         result.append({
             "id": str(org["_id"]),
             "name": org["name"],
@@ -99,7 +86,6 @@ def list_my_organizations(current_user=Depends(get_current_user)):
             "created_at": org.get("created_at"),
             "owner_name": owner.get("name") if owner else None,
             "owner_email": owner.get("email") if owner else None,
-            "members": members,
         })
 
     return result
@@ -127,28 +113,23 @@ def list_organization_members(
     try:
         org_id = ObjectId(organization_id)
     except Exception:
-        raise HTTPException(status_code=400, detail="ID da organização inválido")
+        raise HTTPException(status_code=400, detail="ID inválido")
 
-    org = db.organizations.find_one({"_id": org_id})
-    if not org:
-        raise HTTPException(status_code=404, detail="Organização não encontrada")
-
-    user_id = current_user["_id"]
     membership = db.organization_members.find_one({
         "organization_id": org_id,
-        "user_id": user_id
+        "user_id": current_user["_id"]
     })
 
     if not membership:
-        raise HTTPException(
-            status_code=403,
-            detail="Você não participa desta organização"
-        )
+        raise HTTPException(status_code=403, detail="Sem acesso")
 
-    members_relations = list(db.organization_members.find({"organization_id": org_id}))
+    # busca membros
+    relations = list(
+        db.organization_members.find({"organization_id": org_id})
+    )
 
     members = []
-    for relation in members_relations:
+    for relation in relations:
         user = db.users.find_one({"_id": relation["user_id"]})
         if user:
             members.append({
@@ -170,11 +151,13 @@ def add_organization_member(
     try:
         org_id = ObjectId(organization_id)
     except Exception:
-        raise HTTPException(status_code=400, detail="ID da organização inválido")
+        raise HTTPException(
+            status_code=400, detail="ID da organização inválido")
 
     org = db.organizations.find_one({"_id": org_id})
     if not org:
-        raise HTTPException(status_code=404, detail="Organização não encontrada")
+        raise HTTPException(
+            status_code=404, detail="Organização não encontrada")
 
     current_membership = db.organization_members.find_one({
         "organization_id": org_id,
