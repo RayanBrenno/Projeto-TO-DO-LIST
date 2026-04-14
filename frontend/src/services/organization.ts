@@ -12,11 +12,14 @@ export async function getMyOrganizations(): Promise<Organization[]> {
 }
 
 
-export async function getOrganizations(): Promise<OrganizationWithMembers[]> {
+export async function getOrganizations() {
   const { data } = await api.get("/organizations");
-  const organizations = Array.isArray(data) ? data : [];
+  return Array.isArray(data) ? data : [];
+}
 
-  return organizations.map(normalizeOrganization);
+export async function getOrganizationMembers(orgId: string) {
+  const { data } = await api.get(`/organizations/${orgId}/members`);
+  return Array.isArray(data) ? data : [];
 }
 
 function normalizeOrganization(org: any): OrganizationWithMembers {

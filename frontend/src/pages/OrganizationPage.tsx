@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { Header } from "../components/Header";
 import { CreateOrganizationAccordion } from "../components/organizations/CreateOrganizationAccordion";
 import { OrganizationListAccordion } from "../components/organizations/OrganizationListAccordion";
-import type {OrganizationWithMembers } from "../types/organization";
-import { addOrganizationMember, createOrganization, getOrganizations } from "../services/organization";
-
+import type { OrganizationWithMembers } from "../types/organization";
+import {addOrganizationMember, createOrganization, getOrganizationMembers, getOrganizations} from "../services/organization";
 
 export function OrganizationPage() {
   const [organizations, setOrganizations] = useState<OrganizationWithMembers[]>(
@@ -22,14 +21,31 @@ export function OrganizationPage() {
       setLoading(true);
       setPageError("");
 
-      const organizations = await getOrganizations();
-      setOrganizations(organizations);
+      const orgs = await getOrganizations();
+
+      // inicializa sem members
+      const normalized = orgs.map((org) => ({
+        ...org,
+        members: [],
+        membersLoaded: false,
+      }));
+
+      setOrganizations(normalized);
     } catch (error) {
-      console.error("Erro ao buscar organizações:", error);
       setPageError("Erro ao carregar organizações.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadMembers(orgId: string) {
+    const members = await getOrganizationMembers(orgId);
+
+    setOrganizations((prev) =>
+      prev.map((org) =>
+        org.id === orgId ? { ...org, members, membersLoaded: true } : org,
+      ),
+    );
   }
 
   async function handleCreateOrganization(name: string, description: string) {
@@ -81,6 +97,7 @@ export function OrganizationPage() {
             organizations={organizations}
             loading={loading}
             onAddMember={addMember}
+            onLoadMembers={loadMembers}
           />
         </div>
       </div>

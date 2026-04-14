@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, Mail, Plus } from "lucide-react";
+import {ChevronDown, ChevronRight, Loader2, Mail, Plus} from "lucide-react";
 import type {
   OrganizationMember,
   OrganizationWithMembers,
@@ -8,11 +8,13 @@ import type {
 interface OrganizationCardAccordionProps {
   organization: OrganizationWithMembers;
   onAddMember: (orgId: string, email: string) => Promise<void>;
+  onLoadMembers: (orgId: string) => Promise<void>;
 }
 
 export function OrganizationCardAccordion({
   organization,
   onAddMember,
+  onLoadMembers,
 }: OrganizationCardAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -83,7 +85,13 @@ export function OrganizationCardAccordion({
     <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => {
+          setIsOpen((prev) => !prev);
+
+          if (!organization.membersLoaded) {
+            onLoadMembers(organization.id);
+          }
+        }}
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-100 transition-colors"
       >
         <div>

@@ -7,12 +7,14 @@ interface OrganizationListAccordionProps {
   organizations: OrganizationWithMembers[];
   loading: boolean;
   onAddMember: (orgId: string, email: string) => Promise<void>;
+  onLoadMembers: (orgId: string) => Promise<void>; 
 }
 
 export function OrganizationListAccordion({
   organizations,
   loading,
   onAddMember,
+  onLoadMembers,
 }: OrganizationListAccordionProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -57,6 +59,7 @@ export function OrganizationListAccordion({
                   key={org.id}
                   organization={org}
                   onAddMember={onAddMember}
+                  onLoadMembers={onLoadMembers}
                 />
               ))}
             </div>

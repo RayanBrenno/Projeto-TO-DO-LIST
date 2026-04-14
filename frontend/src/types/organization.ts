@@ -14,4 +14,5 @@ export interface OrganizationWithMembers extends Organization {
   owner_name?: string | null;
   owner_email?: string | null;
   members?: OrganizationMember[];
+  membersLoaded?: boolean; // flag para indicar se os membros já foram carregados
 }
