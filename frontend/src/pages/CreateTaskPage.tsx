@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PlusCircle, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import { Header } from "../components/Header";
 import { createTask } from "../services/task";
-import { getMyOrganizations } from "../services/organization";
+import { getOrganizations } from "../services/organization";
 import type { CreateTaskPayload, TaskType } from "../types/task";
 import type { Organization } from "../types/organization";
 
@@ -61,7 +61,7 @@ export function CreateTaskPage() {
     async function loadOrganizations() {
       try {
         setLoadingOrganizations(true);
-        const data = await getMyOrganizations();
+        const data = await getOrganizations();
         setOrganizations(data);
       } catch (err: any) {
         console.error("Erro ao carregar organizações:", err);

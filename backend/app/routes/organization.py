@@ -4,7 +4,6 @@ from bson import ObjectId
 from datetime import datetime
 from app.database import db
 from app.schemas.organization import OrganizationCreate
-from app.utils.utils_serializers import serialize_organization
 from app.dependencies.auth import get_current_user
 
 
@@ -89,20 +88,6 @@ def list_my_organizations(current_user=Depends(get_current_user)):
         })
 
     return result
-
-
-@router.get("/my")
-def list_my_organizations_legacy(current_user=Depends(get_current_user)):
-    user_id = current_user["_id"]
-    relations = list(db.organization_members.find({"user_id": user_id}))
-
-    if not relations:
-        return []
-
-    org_ids = [rel["organization_id"] for rel in relations]
-    organizations = list(db.organizations.find({"_id": {"$in": org_ids}}))
-
-    return [serialize_organization(org) for org in organizations]
 
 
 @router.get("/{organization_id}/members")

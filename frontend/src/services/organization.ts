@@ -1,16 +1,10 @@
 import { api } from "./api";
-import type { Organization, OrganizationWithMembers,OrganizationMember } from "../types/organization";
+import type { OrganizationWithMembers, OrganizationMember } from "../types/organization";
 
 export interface CreateOrganizationPayload {
   name: string;
   description?: string;
 }
-
-export async function getMyOrganizations(): Promise<Organization[]> {
-  const response = await api.get("/organizations/my");
-  return response.data;
-}
-
 
 export async function getOrganizations() {
   const { data } = await api.get("/organizations");
