@@ -10,23 +10,9 @@ from app.dependencies.auth import get_current_user
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
-def normalize_task_status(status: str) -> str:
-    """
-    Compatibilidade entre status antigos e novos.
-    """
-    if status == "pending":
-        return "to_do"
-    return status
-
-
 def serialize_task_with_organization(task, organization_name=None):
-    """
-    Usa o serializer atual e adiciona organization_name + normalização de status
-    sem quebrar o restante do projeto.
-    """
     serialized = serialize_task(task)
     serialized["organization_name"] = organization_name
-    serialized["status"] = normalize_task_status(serialized.get("status"))
     return serialized
 
 

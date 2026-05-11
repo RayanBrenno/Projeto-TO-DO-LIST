@@ -16,7 +16,7 @@ class TaskResponse(BaseModel):
     description: Optional[str] = None
     due_date: Optional[str] = None
     type: Literal["personal", "organization"]
-    status: Literal["pending", "done"]
+    status: Literal["to_do", "doing", "done"]
     created_by: str
     user_id: Optional[str] = None
     organization_id: Optional[str] = None
