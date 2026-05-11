@@ -16,13 +16,13 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    // Tenta fazer login com as credenciais fornecidas, e navega para o dashboard se for bem-sucedido
+    // Tenta fazer login com as credenciais fornecidas, e navega para o home se for bem-sucedido
     try {
       await login({
         email: email.trim(),
         password,
       });
-      navigate("/dashboard");
+      navigate("/home");
     } catch (err: any) {
       // Exibe uma mensagem de erro caso o login falhe
       setError(err.message || "Erro ao fazer login");

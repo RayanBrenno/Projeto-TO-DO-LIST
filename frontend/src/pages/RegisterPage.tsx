@@ -56,7 +56,7 @@ export default function RegisterPage() {
         email: formData.email.trim(),
         password: formData.password,
       });
-      navigate("/dashboard");
+      navigate("/home");
     } catch (err: any) {
       setError(err.message || "Erro ao registrar");
     } finally {
