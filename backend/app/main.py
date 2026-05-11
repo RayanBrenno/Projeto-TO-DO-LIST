@@ -7,7 +7,7 @@ from app.routes.tasks import router as tasks_router
 
 
 app = FastAPI(
-    title="API de Análise de Crédito",
+    title="TaskHub API",
     version="1.0.0"
 )
 
