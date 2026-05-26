@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.autenticacao import router as auth_router
 from app.routes.organization import router as organization_router
 from app.routes.tasks import router as tasks_router
+from app.routes.invites import router as invites_router
 
 
 app = FastAPI(
@@ -25,3 +26,4 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(organization_router)
 app.include_router(tasks_router)
+app.include_router(invites_router)
