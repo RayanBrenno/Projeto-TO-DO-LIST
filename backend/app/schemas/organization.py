@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Literal, Optional
 
 
 class OrganizationCreate(BaseModel):
@@ -25,3 +25,11 @@ class OrganizationResponse(BaseModel):
     owner_id: str
     created_at: str
     updated_at: str
+
+
+class InviteResponse(BaseModel):
+    invite_id: str
+    org_id: str
+    org_name: str
+    invited_by_name: str
+    created_at: Optional[str] = None
