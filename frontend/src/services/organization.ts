@@ -1,5 +1,5 @@
 import { api } from "./api";
-import type { OrganizationWithMembers, OrganizationMember } from "../types/organization";
+import type { OrganizationWithMembers, OrganizationMember, Invite } from "../types/organization";
 
 export interface CreateOrganizationPayload {
   name: string;
@@ -40,4 +40,25 @@ export async function addOrganizationMember(
   const returnedMember = data?.member;
 
   return returnedMember?.email ? returnedMember : { email };
+}
+
+export async function getPendingInvites(): Promise<Invite[]> {
+  const { data } = await api.get("/invites/me");
+  return Array.isArray(data) ? data : [];
+}
+
+export async function acceptInvite(inviteId: string): Promise<void> {
+  await api.post(`/invites/${inviteId}/accept`);
+}
+
+export async function declineInvite(inviteId: string): Promise<void> {
+  await api.post(`/invites/${inviteId}/decline`);
+}
+
+export async function deleteOrganization(orgId: string): Promise<void> {
+  await api.delete(`/organizations/${orgId}`);
+}
+
+export async function leaveOrganization(orgId: string): Promise<void> {
+  await api.delete(`/organizations/${orgId}/members/me`);
 }

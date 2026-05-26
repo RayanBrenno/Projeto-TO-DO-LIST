@@ -7,6 +7,9 @@ export interface Organization {
 export interface OrganizationMember {
   id?: string;
   email: string;
+  role?: string;
+  joined_at?: string | null;
+  is_pending?: boolean;
 }
 
 export interface OrganizationWithMembers extends Organization {
@@ -14,5 +17,13 @@ export interface OrganizationWithMembers extends Organization {
   owner_name?: string | null;
   owner_email?: string | null;
   members?: OrganizationMember[];
-  membersLoaded?: boolean; // flag para indicar se os membros já foram carregados
+  membersLoaded?: boolean;
+}
+
+export interface Invite {
+  invite_id: string;
+  org_id: string;
+  org_name: string;
+  invited_by_name: string;
+  created_at: string | null;
 }
