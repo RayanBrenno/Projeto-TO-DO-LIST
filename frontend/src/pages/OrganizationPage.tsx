@@ -2,18 +2,31 @@ import { useEffect, useState } from "react";
 import { Header } from "../components/Header";
 import { CreateOrganizationAccordion } from "../components/organizations/CreateOrganizationAccordion";
 import { OrganizationListAccordion } from "../components/organizations/OrganizationListAccordion";
-import type { OrganizationWithMembers } from "../types/organization";
-import {addOrganizationMember, createOrganization, getOrganizationMembers, getOrganizations} from "../services/organization";
+import type { Invite, OrganizationWithMembers } from "../types/organization";
+import {
+  acceptInvite,
+  addOrganizationMember,
+  createOrganization,
+  declineInvite,
+  deleteOrganization,
+  getOrganizationMembers,
+  getOrganizations,
+  getPendingInvites,
+  leaveOrganization,
+} from "../services/organization";
+import { useAuth } from "../contexts/AuthContext";
+import { Mail, UserCheck, UserX } from "lucide-react";
 
 export function OrganizationPage() {
-  const [organizations, setOrganizations] = useState<OrganizationWithMembers[]>(
-    [],
-  );
+  const { user } = useAuth();
+  const [organizations, setOrganizations] = useState<OrganizationWithMembers[]>([]);
+  const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
 
   useEffect(() => {
     fetchOrganizations();
+    fetchInvites();
   }, []);
 
   async function fetchOrganizations() {
@@ -23,7 +36,6 @@ export function OrganizationPage() {
 
       const orgs = await getOrganizations();
 
-      // inicializa sem members
       const normalized = orgs.map((org) => ({
         ...org,
         members: [],
@@ -31,10 +43,19 @@ export function OrganizationPage() {
       }));
 
       setOrganizations(normalized);
-    } catch (error) {
+    } catch {
       setPageError("Erro ao carregar organizações.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchInvites() {
+    try {
+      const data = await getPendingInvites();
+      setInvites(data);
+    } catch {
+      // silencia erros de convite para não bloquear a página
     }
   }
 
@@ -74,6 +95,35 @@ export function OrganizationPage() {
     );
   }
 
+  async function handleAcceptInvite(inviteId: string, orgId: string) {
+    await acceptInvite(inviteId);
+    setInvites((prev) => prev.filter((i) => i.invite_id !== inviteId));
+
+    // recarrega orgs para mostrar a nova org aceita
+    const orgs = await getOrganizations();
+    setOrganizations(
+      orgs.map((org) => ({ ...org, members: [], membersLoaded: false })),
+    );
+
+    // Remove o orgId da lista de membros carregados para forçar reload quando abrir
+    void orgId;
+  }
+
+  async function handleDeclineInvite(inviteId: string) {
+    await declineInvite(inviteId);
+    setInvites((prev) => prev.filter((i) => i.invite_id !== inviteId));
+  }
+
+  async function handleDeleteOrganization(orgId: string) {
+    await deleteOrganization(orgId);
+    setOrganizations((prev) => prev.filter((org) => org.id !== orgId));
+  }
+
+  async function handleLeaveOrganization(orgId: string) {
+    await leaveOrganization(orgId);
+    setOrganizations((prev) => prev.filter((org) => org.id !== orgId));
+  }
+
   return (
     <>
       <Header
@@ -89,6 +139,61 @@ export function OrganizationPage() {
             </div>
           )}
 
+          {invites.length > 0 && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 overflow-hidden">
+              <div className="px-5 py-4 border-b border-blue-200">
+                <h3 className="text-sm font-semibold text-blue-900">
+                  Convites Recebidos
+                </h3>
+                <p className="text-sm text-blue-600 mt-0.5">
+                  Você tem {invites.length} convite(s) pendente(s).
+                </p>
+              </div>
+
+              <div className="bg-white divide-y divide-slate-100">
+                {invites.map((invite) => (
+                  <div
+                    key={invite.invite_id}
+                    className="flex items-center justify-between px-5 py-4 gap-4"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Mail size={16} className="text-blue-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          {invite.org_name}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Convidado por {invite.invited_by_name}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleAcceptInvite(invite.invite_id, invite.org_id)
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 transition-colors"
+                      >
+                        <UserCheck size={13} />
+                        Aceitar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeclineInvite(invite.invite_id)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        <UserX size={13} />
+                        Recusar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <CreateOrganizationAccordion
             onCreateOrganization={handleCreateOrganization}
           />
@@ -98,6 +203,9 @@ export function OrganizationPage() {
             loading={loading}
             onAddMember={addMember}
             onLoadMembers={loadMembers}
+            onDeleteOrganization={handleDeleteOrganization}
+            onLeaveOrganization={handleLeaveOrganization}
+            currentUserEmail={user?.email}
           />
         </div>
       </div>
