@@ -7,7 +7,10 @@ interface OrganizationListAccordionProps {
   organizations: OrganizationWithMembers[];
   loading: boolean;
   onAddMember: (orgId: string, email: string) => Promise<void>;
-  onLoadMembers: (orgId: string) => Promise<void>; 
+  onLoadMembers: (orgId: string) => Promise<void>;
+  onDeleteOrganization: (orgId: string) => Promise<void>;
+  onLeaveOrganization: (orgId: string) => Promise<void>;
+  currentUserEmail?: string;
 }
 
 export function OrganizationListAccordion({
@@ -15,6 +18,9 @@ export function OrganizationListAccordion({
   loading,
   onAddMember,
   onLoadMembers,
+  onDeleteOrganization,
+  onLeaveOrganization,
+  currentUserEmail,
 }: OrganizationListAccordionProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -60,6 +66,12 @@ export function OrganizationListAccordion({
                   organization={org}
                   onAddMember={onAddMember}
                   onLoadMembers={onLoadMembers}
+                  onDeleteOrganization={() => onDeleteOrganization(org.id)}
+                  onLeaveOrganization={() => onLeaveOrganization(org.id)}
+                  isOwner={
+                    !!currentUserEmail &&
+                    org.owner_email?.toLowerCase() === currentUserEmail.toLowerCase()
+                  }
                 />
               ))}
             </div>
