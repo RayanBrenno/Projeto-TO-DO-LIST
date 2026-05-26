@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Header } from "../components/Header";
 import { getMyTasks, updateTaskStatus } from "../services/task";
-import { getOrganizations } from "../services/organization";
+import { getOrganizations, getPendingInvites } from "../services/organization";
 import { type Organization } from "../types/organization";
 import { type Task } from "../types/task";
-import { Calendar, Building2 } from "lucide-react";
+import { Calendar, Building2, Mail } from "lucide-react";
 
 export function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [pendingInvitesCount, setPendingInvitesCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,17 +21,20 @@ export function HomePage() {
     try {
       setLoading(true);
 
-      const [tasks, organizations] = await Promise.all([
+      const [tasks, organizations, invites] = await Promise.all([
         getMyTasks(),
         getOrganizations(),
+        getPendingInvites(),
       ]);
 
       setTasks(tasks);
       setOrganizations(organizations);
+      setPendingInvitesCount(invites.length);
     } catch (error) {
       console.error("Erro ao buscar dados da home:", error);
       setTasks([]);
       setOrganizations([]);
+      setPendingInvitesCount(0);
     } finally {
       setLoading(false);
     }
@@ -117,6 +122,25 @@ export function HomePage() {
       />
 
       <div className="p-8 space-y-8">
+        {pendingInvitesCount > 0 && (
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
+            <div className="flex items-center gap-3">
+              <Mail size={18} className="text-blue-500 shrink-0" />
+              <p className="text-sm text-blue-800">
+                Você tem{" "}
+                <span className="font-semibold">{pendingInvitesCount}</span>{" "}
+                convite(s) pendente(s) para entrar em organizações.
+              </p>
+            </div>
+            <Link
+              to="/organization"
+              className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              Ver convites
+            </Link>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border border-blue-200">
             <p className="text-blue-600 text-sm font-semibold uppercase tracking-wide">
