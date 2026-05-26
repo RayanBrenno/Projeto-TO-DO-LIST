@@ -108,10 +108,7 @@ def list_organization_members(
     if not membership:
         raise HTTPException(status_code=403, detail="Sem acesso")
 
-    # busca membros
-    relations = list(
-        db.organization_members.find({"organization_id": org_id})
-    )
+    relations = list(db.organization_members.find({"organization_id": org_id}))
 
     members = []
     for relation in relations:
@@ -122,13 +119,87 @@ def list_organization_members(
                 "email": user.get("email"),
                 "role": relation.get("role"),
                 "joined_at": relation.get("joined_at"),
+                "is_pending": False,
             })
+
+    if membership.get("role") == "owner":
+        pending_invites = list(db.organization_invites.find({
+            "organization_id": org_id,
+            "status": "pending"
+        }))
+        for invite in pending_invites:
+            user = db.users.find_one({"_id": invite["invited_user_id"]})
+            if user:
+                members.append({
+                    "id": str(invite["_id"]),
+                    "email": user.get("email"),
+                    "role": "member",
+                    "joined_at": None,
+                    "is_pending": True,
+                })
 
     return members
 
 
+@router.delete("/{organization_id}")
+def delete_organization(
+    organization_id: str,
+    current_user=Depends(get_current_user)
+):
+    try:
+        org_id = ObjectId(organization_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID inválido")
+
+    membership = db.organization_members.find_one({
+        "organization_id": org_id,
+        "user_id": current_user["_id"],
+        "role": "owner",
+    })
+    if not membership:
+        raise HTTPException(status_code=403, detail="Apenas o dono pode excluir a organização")
+
+    db.tasks.delete_many({"organization_id": org_id})
+    db.organization_invites.delete_many({"organization_id": org_id})
+    db.organization_members.delete_many({"organization_id": org_id})
+    db.organizations.delete_one({"_id": org_id})
+
+    return {"message": "Organização excluída com sucesso"}
+
+
+@router.delete("/{organization_id}/members/me")
+def leave_organization(
+    organization_id: str,
+    current_user=Depends(get_current_user)
+):
+    try:
+        org_id = ObjectId(organization_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID inválido")
+
+    membership = db.organization_members.find_one({
+        "organization_id": org_id,
+        "user_id": current_user["_id"],
+    })
+    if not membership:
+        raise HTTPException(status_code=404, detail="Você não é membro desta organização")
+
+    if membership.get("role") == "owner":
+        raise HTTPException(
+            status_code=400,
+            detail="O dono não pode sair da organização. Exclua-a se desejar."
+        )
+
+    db.organization_members.delete_one({
+        "organization_id": org_id,
+        "user_id": current_user["_id"],
+    })
+
+    return {"message": "Você saiu da organização"}
+
+
 @router.post("/{organization_id}/members")
-def add_organization_member(
+def invite_organization_member(
     organization_id: str,
     data: AddOrganizationMemberPayload,
     current_user=Depends(get_current_user)
@@ -158,39 +229,49 @@ def add_organization_member(
     if current_membership.get("role") != "owner":
         raise HTTPException(
             status_code=403,
-            detail="Apenas o dono da organização pode adicionar membros"
+            detail="Apenas o dono da organização pode convidar membros"
         )
 
-    user_to_add = db.users.find_one({"email": data.email.lower().strip()})
-    if not user_to_add:
+    user_to_invite = db.users.find_one({"email": data.email.lower().strip()})
+    if not user_to_invite:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
     existing_membership = db.organization_members.find_one({
         "organization_id": org_id,
-        "user_id": user_to_add["_id"]
+        "user_id": user_to_invite["_id"]
     })
-
     if existing_membership:
         raise HTTPException(
             status_code=400,
             detail="Esse usuário já faz parte da organização"
         )
 
-    now = datetime.utcnow().isoformat()
-
-    member_relation = {
+    existing_invite = db.organization_invites.find_one({
         "organization_id": org_id,
-        "user_id": user_to_add["_id"],
-        "role": "member",
-        "joined_at": now,
-    }
+        "invited_user_id": user_to_invite["_id"],
+        "status": "pending"
+    })
+    if existing_invite:
+        raise HTTPException(
+            status_code=400,
+            detail="Já existe um convite pendente para este usuário"
+        )
 
-    db.organization_members.insert_one(member_relation)
+    now = datetime.utcnow().isoformat()
+    invite = {
+        "organization_id": org_id,
+        "invited_user_id": user_to_invite["_id"],
+        "invited_by": current_user["_id"],
+        "status": "pending",
+        "created_at": now,
+    }
+    db.organization_invites.insert_one(invite)
 
     return {
-        "message": "Membro adicionado com sucesso",
+        "message": "Convite enviado com sucesso",
         "member": {
-            "id": str(user_to_add["_id"]),
-            "email": user_to_add.get("email"),
+            "id": str(invite["_id"]),
+            "email": user_to_invite.get("email"),
+            "is_pending": True,
         }
     }
