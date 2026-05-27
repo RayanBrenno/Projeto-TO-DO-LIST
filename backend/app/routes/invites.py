@@ -87,3 +87,26 @@ def decline_invite(invite_id: str, current_user=Depends(get_current_user)):
     )
 
     return {"message": "Convite recusado"}
+
+
+@router.delete("/{invite_id}")
+def cancel_invite(invite_id: str, current_user=Depends(get_current_user)):
+    try:
+        inv_id = ObjectId(invite_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID do convite inválido")
+
+    invite = db.organization_invites.find_one({"_id": inv_id, "status": "pending"})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Convite não encontrado")
+
+    membership = db.organization_members.find_one({
+        "organization_id": invite["organization_id"],
+        "user_id": current_user["_id"],
+        "role": "owner",
+    })
+    if not membership:
+        raise HTTPException(status_code=403, detail="Apenas o dono pode cancelar convites")
+
+    db.organization_invites.delete_one({"_id": inv_id})
+    return {"message": "Convite cancelado"}
