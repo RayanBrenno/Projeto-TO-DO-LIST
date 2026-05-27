@@ -62,3 +62,25 @@ export async function deleteOrganization(orgId: string): Promise<void> {
 export async function leaveOrganization(orgId: string): Promise<void> {
   await api.delete(`/organizations/${orgId}/members/me`);
 }
+
+export async function cancelInvite(inviteId: string): Promise<void> {
+  await api.delete(`/invites/${inviteId}`);
+}
+
+export async function updateMemberRole(
+  orgId: string,
+  memberId: string,
+  role: "co-owner" | "member",
+): Promise<void> {
+  await api.patch(`/organizations/${orgId}/members/${memberId}/role`, { role });
+}
+
+export async function transferOwnership(
+  orgId: string,
+  newOwnerId: string,
+): Promise<{ new_owner_email: string; new_owner_name: string }> {
+  const { data } = await api.post(`/organizations/${orgId}/transfer-ownership`, {
+    new_owner_id: newOwnerId,
+  });
+  return data;
+}

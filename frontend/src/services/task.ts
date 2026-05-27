@@ -22,3 +22,7 @@ export async function updateTaskStatus(
 ): Promise<void> {
   await api.put(`/tasks/${taskId}`, { status });
 }
+
+export async function deleteTask(taskId: string): Promise<void> {
+  await api.delete(`/tasks/${taskId}`);
+}
