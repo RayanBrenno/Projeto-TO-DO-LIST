@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
+from typing import Literal
 from bson import ObjectId
 from datetime import datetime
 from app.database import db
@@ -274,4 +275,108 @@ def invite_organization_member(
             "email": user_to_invite.get("email"),
             "is_pending": True,
         }
+    }
+
+
+class UpdateMemberRolePayload(BaseModel):
+    role: Literal["co-owner", "member"]
+
+
+@router.patch("/{organization_id}/members/{member_id}/role")
+def update_member_role(
+    organization_id: str,
+    member_id: str,
+    data: UpdateMemberRolePayload,
+    current_user=Depends(get_current_user),
+):
+    try:
+        org_id = ObjectId(organization_id)
+        mem_user_id = ObjectId(member_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID inválido")
+
+    ownership = db.organization_members.find_one({
+        "organization_id": org_id,
+        "user_id": current_user["_id"],
+        "role": "owner",
+    })
+    if not ownership:
+        raise HTTPException(status_code=403, detail="Apenas o dono pode alterar roles")
+
+    target = db.organization_members.find_one({
+        "organization_id": org_id,
+        "user_id": mem_user_id,
+    })
+    if not target:
+        raise HTTPException(status_code=404, detail="Membro não encontrado")
+
+    if target.get("role") == "owner":
+        raise HTTPException(status_code=400, detail="Não é possível alterar o role do dono por aqui")
+
+    db.organization_members.update_one(
+        {"_id": target["_id"]},
+        {"$set": {"role": data.role}},
+    )
+
+    user = db.users.find_one({"_id": mem_user_id})
+    return {
+        "message": "Role atualizado com sucesso",
+        "member": {
+            "id": str(mem_user_id),
+            "email": user.get("email") if user else None,
+            "role": data.role,
+        },
+    }
+
+
+class TransferOwnershipPayload(BaseModel):
+    new_owner_id: str
+
+
+@router.post("/{organization_id}/transfer-ownership")
+def transfer_ownership(
+    organization_id: str,
+    data: TransferOwnershipPayload,
+    current_user=Depends(get_current_user),
+):
+    try:
+        org_id = ObjectId(organization_id)
+        new_owner_obj_id = ObjectId(data.new_owner_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID inválido")
+
+    current_ownership = db.organization_members.find_one({
+        "organization_id": org_id,
+        "user_id": current_user["_id"],
+        "role": "owner",
+    })
+    if not current_ownership:
+        raise HTTPException(status_code=403, detail="Apenas o dono pode transferir ownership")
+
+    new_owner_membership = db.organization_members.find_one({
+        "organization_id": org_id,
+        "user_id": new_owner_obj_id,
+        "role": {"$in": ["member", "co-owner"]},
+    })
+    if not new_owner_membership:
+        raise HTTPException(status_code=404, detail="Membro não encontrado na organização")
+
+    db.organization_members.update_one(
+        {"organization_id": org_id, "user_id": current_user["_id"]},
+        {"$set": {"role": "co-owner"}},
+    )
+    db.organization_members.update_one(
+        {"organization_id": org_id, "user_id": new_owner_obj_id},
+        {"$set": {"role": "owner"}},
+    )
+    db.organizations.update_one(
+        {"_id": org_id},
+        {"$set": {"owner_id": new_owner_obj_id}},
+    )
+
+    new_owner_user = db.users.find_one({"_id": new_owner_obj_id})
+    return {
+        "message": "Ownership transferido com sucesso",
+        "new_owner_email": new_owner_user.get("email") if new_owner_user else None,
+        "new_owner_name": new_owner_user.get("name") if new_owner_user else None,
     }
