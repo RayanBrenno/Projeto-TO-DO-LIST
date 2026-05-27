@@ -53,17 +53,17 @@ def create_task(data: TaskCreate, current_user=Depends(get_current_user)):
         if not organization:
             raise HTTPException(status_code=404, detail="Organização não encontrada")
 
-        # regra principal: só owner pode criar tarefa da organização
-        owner_membership = db.organization_members.find_one({
+        # owner e co-owner podem criar tarefas de organização
+        creator_membership = db.organization_members.find_one({
             "organization_id": org_id,
             "user_id": current_user_id,
-            "role": "owner",
+            "role": {"$in": ["owner", "co-owner"]},
         })
 
-        if not owner_membership:
+        if not creator_membership:
             raise HTTPException(
                 status_code=403,
-                detail="Apenas o líder da organização pode criar tarefas organizacionais"
+                detail="Apenas o líder ou co-líder da organização pode criar tarefas organizacionais"
             )
 
         task["organization_id"] = org_id
@@ -207,3 +207,36 @@ def update_task(task_id: str, data: TaskUpdate, current_user=Depends(get_current
             organization_name = organization.get("name")
 
     return serialize_task_with_organization(updated_task, organization_name)
+
+
+@router.delete("/{task_id}")
+def delete_task(task_id: str, current_user=Depends(get_current_user)):
+    try:
+        task_object_id = ObjectId(task_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID da task inválido")
+
+    current_user_id = current_user["_id"]
+
+    task = db.tasks.find_one({"_id": task_object_id})
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+
+    can_delete = False
+
+    if task.get("type") == "personal" and task.get("user_id") == current_user_id:
+        can_delete = True
+    elif task.get("type") == "organization" and task.get("organization_id"):
+        membership = db.organization_members.find_one({
+            "organization_id": task["organization_id"],
+            "user_id": current_user_id,
+            "role": {"$in": ["owner", "co-owner"]},
+        })
+        if membership:
+            can_delete = True
+
+    if not can_delete:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para excluir esta tarefa")
+
+    db.tasks.delete_one({"_id": task_object_id})
+    return {"message": "Tarefa excluída com sucesso"}
