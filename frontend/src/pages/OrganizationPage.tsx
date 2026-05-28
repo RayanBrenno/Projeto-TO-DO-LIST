@@ -6,6 +6,7 @@ import type { Invite, OrganizationWithMembers } from "../types/organization";
 import {
   acceptInvite,
   addOrganizationMember,
+  cancelInvite,
   createOrganization,
   declineInvite,
   deleteOrganization,
@@ -13,6 +14,8 @@ import {
   getOrganizations,
   getPendingInvites,
   leaveOrganization,
+  transferOwnership,
+  updateMemberRole,
 } from "../services/organization";
 import { useAuth } from "../contexts/AuthContext";
 import { Mail, UserCheck, UserX } from "lucide-react";
@@ -124,6 +127,62 @@ export function OrganizationPage() {
     setOrganizations((prev) => prev.filter((org) => org.id !== orgId));
   }
 
+  async function handleCancelInvite(orgId: string, inviteId: string) {
+    await cancelInvite(inviteId);
+    setOrganizations((prev) =>
+      prev.map((org) =>
+        org.id === orgId
+          ? { ...org, members: (org.members || []).filter((m) => m.id !== inviteId) }
+          : org,
+      ),
+    );
+  }
+
+  async function handleUpdateMemberRole(
+    orgId: string,
+    memberId: string,
+    role: "co-owner" | "member",
+  ) {
+    await updateMemberRole(orgId, memberId, role);
+    setOrganizations((prev) =>
+      prev.map((org) =>
+        org.id === orgId
+          ? {
+              ...org,
+              members: (org.members || []).map((m) =>
+                m.id === memberId ? { ...m, role } : m,
+              ),
+            }
+          : org,
+      ),
+    );
+  }
+
+  async function handleTransferOwnership(
+    orgId: string,
+    newOwnerId: string,
+  ): Promise<{ new_owner_email: string; new_owner_name: string }> {
+    const result = await transferOwnership(orgId, newOwnerId);
+    setOrganizations((prev) =>
+      prev.map((org) =>
+        org.id === orgId
+          ? {
+              ...org,
+              owner_email: result.new_owner_email,
+              owner_name: result.new_owner_name,
+              members: (org.members || []).map((m) => {
+                if (m.id === newOwnerId) return { ...m, role: "owner" };
+                if (org.owner_email && m.email?.toLowerCase() === org.owner_email.toLowerCase())
+                  return { ...m, role: "co-owner" };
+                return m;
+              }),
+            }
+          : org,
+      ),
+    );
+    return result;
+  }
+
   return (
     <>
       <Header
@@ -205,6 +264,9 @@ export function OrganizationPage() {
             onLoadMembers={loadMembers}
             onDeleteOrganization={handleDeleteOrganization}
             onLeaveOrganization={handleLeaveOrganization}
+            onCancelInvite={handleCancelInvite}
+            onUpdateMemberRole={handleUpdateMemberRole}
+            onTransferOwnership={handleTransferOwnership}
             currentUserEmail={user?.email}
           />
         </div>
