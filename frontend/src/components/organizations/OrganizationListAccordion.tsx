@@ -10,6 +10,9 @@ interface OrganizationListAccordionProps {
   onLoadMembers: (orgId: string) => Promise<void>;
   onDeleteOrganization: (orgId: string) => Promise<void>;
   onLeaveOrganization: (orgId: string) => Promise<void>;
+  onCancelInvite: (orgId: string, inviteId: string) => Promise<void>;
+  onUpdateMemberRole: (orgId: string, memberId: string, role: "co-owner" | "member") => Promise<void>;
+  onTransferOwnership: (orgId: string, newOwnerId: string) => Promise<{ new_owner_email: string; new_owner_name: string }>;
   currentUserEmail?: string;
 }
 
@@ -20,6 +23,9 @@ export function OrganizationListAccordion({
   onLoadMembers,
   onDeleteOrganization,
   onLeaveOrganization,
+  onCancelInvite,
+  onUpdateMemberRole,
+  onTransferOwnership,
   currentUserEmail,
 }: OrganizationListAccordionProps) {
   const [isOpen, setIsOpen] = useState(true);
@@ -68,6 +74,9 @@ export function OrganizationListAccordion({
                   onLoadMembers={onLoadMembers}
                   onDeleteOrganization={() => onDeleteOrganization(org.id)}
                   onLeaveOrganization={() => onLeaveOrganization(org.id)}
+                  onCancelInvite={(inviteId) => onCancelInvite(org.id, inviteId)}
+                  onUpdateMemberRole={(memberId, role) => onUpdateMemberRole(org.id, memberId, role)}
+                  onTransferOwnership={(newOwnerId) => onTransferOwnership(org.id, newOwnerId)}
                   isOwner={
                     !!currentUserEmail &&
                     org.owner_email?.toLowerCase() === currentUserEmail.toLowerCase()
