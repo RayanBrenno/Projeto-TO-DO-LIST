@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Clock, Loader2, LogOut, Mail, Plus, Trash2 } from "lucide-react";
-import type {
-  OrganizationMember,
-  OrganizationWithMembers,
-} from "../../types/organization";
+import {
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Loader2,
+  LogOut,
+  Mail,
+  Plus,
+  Trash2,
+  X,
+  Shield,
+  ArrowRightLeft,
+} from "lucide-react";
+import type { OrganizationMember, OrganizationWithMembers } from "../../types/organization";
 
 interface OrganizationCardAccordionProps {
   organization: OrganizationWithMembers;
@@ -11,6 +20,9 @@ interface OrganizationCardAccordionProps {
   onLoadMembers: (orgId: string) => Promise<void>;
   onDeleteOrganization?: () => Promise<void>;
   onLeaveOrganization?: () => Promise<void>;
+  onCancelInvite?: (inviteId: string) => Promise<void>;
+  onUpdateMemberRole?: (memberId: string, role: "co-owner" | "member") => Promise<void>;
+  onTransferOwnership?: (newOwnerId: string) => Promise<{ new_owner_email: string; new_owner_name: string }>;
   isOwner?: boolean;
 }
 
@@ -20,6 +32,9 @@ export function OrganizationCardAccordion({
   onLoadMembers,
   onDeleteOrganization,
   onLeaveOrganization,
+  onCancelInvite,
+  onUpdateMemberRole,
+  onTransferOwnership,
   isOwner = false,
 }: OrganizationCardAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -31,6 +46,11 @@ export function OrganizationCardAccordion({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferSelectedId, setTransferSelectedId] = useState("");
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [roleLoadingId, setRoleLoadingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const orgContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,6 +62,8 @@ export function OrganizationCardAccordion({
   const members = organization.members || [];
   const activeMembers = members.filter((m) => !m.is_pending);
   const pendingMembers = members.filter((m) => m.is_pending);
+
+  const transferCandidates = activeMembers.filter((m) => m.role !== "owner");
 
   function formatDate(date?: string) {
     if (!date) return "Não informado";
@@ -63,15 +85,11 @@ export function OrganizationCardAccordion({
       setMemberError("O e-mail do membro é obrigatório.");
       return;
     }
-
     if (!isValidEmail(email)) {
       setMemberError("Informe um e-mail válido.");
       return;
     }
-
-    const alreadyExists = members.some(
-      (member) => member.email.toLowerCase() === email,
-    );
+    const alreadyExists = members.some((m) => m.email.toLowerCase() === email);
     if (alreadyExists) {
       setMemberError("Esse e-mail já faz parte da organização.");
       return;
@@ -84,10 +102,7 @@ export function OrganizationCardAccordion({
       setMemberSuccess("Convite enviado com sucesso.");
       setMembersOpen(true);
     } catch (error: any) {
-      console.error("Erro ao adicionar membro:", error);
-      setMemberError(
-        error?.response?.data?.detail || "Erro ao adicionar membro.",
-      );
+      setMemberError(error?.response?.data?.detail || "Erro ao adicionar membro.");
     } finally {
       setAddingMember(false);
     }
@@ -115,28 +130,87 @@ export function OrganizationCardAccordion({
     }
   }
 
+  async function handleCancelInvite(inviteId: string) {
+    if (!onCancelInvite) return;
+    try {
+      setCancellingId(inviteId);
+      await onCancelInvite(inviteId);
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  async function handleUpdateRole(memberId: string, role: "co-owner" | "member") {
+    if (!onUpdateMemberRole) return;
+    try {
+      setRoleLoadingId(memberId);
+      await onUpdateMemberRole(memberId, role);
+    } finally {
+      setRoleLoadingId(null);
+    }
+  }
+
+  async function handleTransferOwnership() {
+    if (!onTransferOwnership || !transferSelectedId) return;
+    try {
+      setTransferLoading(true);
+      await onTransferOwnership(transferSelectedId);
+      setTransferOpen(false);
+      setTransferSelectedId("");
+    } catch {
+      setTransferLoading(false);
+    }
+  }
+
+  function roleBadge(member: OrganizationMember) {
+    if (member.is_pending) {
+      return (
+        <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
+          Convite Pendente
+        </span>
+      );
+    }
+    if (member.role === "owner") {
+      return (
+        <span className="text-xs font-medium text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">
+          Dono
+        </span>
+      );
+    }
+    if (member.role === "co-owner") {
+      return (
+        <span className="text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+          Co-dono
+        </span>
+      );
+    }
+    return (
+      <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+        Membro
+      </span>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
       <button
         type="button"
         onClick={() => {
           setIsOpen((prev) => {
-            if (!prev) setTimeout(() => orgContentRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+            if (!prev)
+              setTimeout(
+                () => orgContentRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
+                50,
+              );
             return !prev;
           });
-          if (!organization.membersLoaded) {
-            onLoadMembers(organization.id);
-          }
+          if (!organization.membersLoaded) onLoadMembers(organization.id);
         }}
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-100 transition-colors"
       >
         <div>
-          <h3 className="text-sm md:text-base font-semibold text-slate-900">
-            {organization.name}
-          </h3>
-          <p className="text-sm text-slate-500 mt-1">
-            {organization.description || "Sem descrição"}
-          </p>
+          <h3 className="text-sm md:text-base font-semibold text-slate-900">{organization.name}</h3>
+          <p className="text-sm text-slate-500 mt-1">{organization.description || "Sem descrição"}</p>
         </div>
         <div className="text-slate-500">
           {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
@@ -147,29 +221,28 @@ export function OrganizationCardAccordion({
         <div ref={orgContentRef} className="border-t border-slate-200 bg-white px-5 py-5 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-xl bg-slate-50 px-4 py-3 border border-slate-200">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Criado por
-              </p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Criado por</p>
               <p className="text-sm text-slate-900 mt-1">
                 {organization.owner_name || organization.owner_email || "Não informado"}
               </p>
             </div>
             <div className="rounded-xl bg-slate-50 px-4 py-3 border border-slate-200">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Data de criação
-              </p>
-              <p className="text-sm text-slate-900 mt-1">
-                {formatDate(organization.created_at)}
-              </p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Data de criação</p>
+              <p className="text-sm text-slate-900 mt-1">{formatDate(organization.created_at)}</p>
             </div>
           </div>
 
+          {/* Members accordion */}
           <div className="ml-0 md:ml-4 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
             <button
               type="button"
               onClick={() => {
                 setMembersOpen((prev) => {
-                  if (!prev) setTimeout(() => orgContentRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+                  if (!prev)
+                    setTimeout(
+                      () => orgContentRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
+                      50,
+                    );
                   return !prev;
                 });
               }}
@@ -226,22 +299,55 @@ export function OrganizationCardAccordion({
                             ) : (
                               <Mail size={16} className="text-slate-500 shrink-0" />
                             )}
-                            <span className="text-sm text-slate-800 flex-1">
+                            <span className="text-sm text-slate-800 flex-1 min-w-0 truncate">
                               {member.email}
                             </span>
-                            {member.is_pending ? (
-                              <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
-                                Convite Pendente
-                              </span>
-                            ) : member.role === "owner" ? (
-                              <span className="text-xs font-medium text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">
-                                Dono
-                              </span>
-                            ) : (
-                              <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
-                                Membro
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2 shrink-0">
+                              {roleBadge(member)}
+
+                              {/* Cancelar convite pendente — só owner */}
+                              {isOwner && member.is_pending && member.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelInvite(member.id!)}
+                                  disabled={cancellingId === member.id}
+                                  className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50 disabled:opacity-60"
+                                  title="Cancelar convite"
+                                >
+                                  {cancellingId === member.id ? (
+                                    <Loader2 size={13} className="animate-spin" />
+                                  ) : (
+                                    <X size={13} />
+                                  )}
+                                </button>
+                              )}
+
+                              {/* Promover / rebaixar — só owner, só membros ativos não-owner */}
+                              {isOwner && !member.is_pending && member.role !== "owner" && member.id && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRole(
+                                      member.id!,
+                                      member.role === "co-owner" ? "member" : "co-owner",
+                                    )
+                                  }
+                                  disabled={roleLoadingId === member.id}
+                                  className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded-lg hover:bg-blue-50 disabled:opacity-60"
+                                  title={
+                                    member.role === "co-owner"
+                                      ? "Rebaixar para membro"
+                                      : "Promover a co-dono"
+                                  }
+                                >
+                                  {roleLoadingId === member.id ? (
+                                    <Loader2 size={13} className="animate-spin" />
+                                  ) : (
+                                    <Shield size={13} />
+                                  )}
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))
                       )}
@@ -283,12 +389,8 @@ export function OrganizationCardAccordion({
                             )}
                           </button>
                         </div>
-                        {memberError && (
-                          <p className="text-sm text-red-600">{memberError}</p>
-                        )}
-                        {memberSuccess && (
-                          <p className="text-sm text-green-600">{memberSuccess}</p>
-                        )}
+                        {memberError && <p className="text-sm text-red-600">{memberError}</p>}
+                        {memberSuccess && <p className="text-sm text-green-600">{memberSuccess}</p>}
                       </div>
                     )}
                   </>
@@ -297,39 +399,93 @@ export function OrganizationCardAccordion({
             )}
           </div>
 
+          {/* Actions */}
           <div className="flex justify-end pt-1">
             {isOwner ? (
-              confirmDelete ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600">Tem certeza? Isso é irreversível.</span>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(false)}
-                    disabled={actionLoading}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteOrg}
-                    disabled={actionLoading}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
-                  >
-                    {actionLoading && <Loader2 size={12} className="animate-spin" />}
-                    Confirmar exclusão
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
-                >
-                  <Trash2 size={13} />
-                  Excluir organização
-                </button>
-              )
+              <>
+                {transferOpen ? (
+                  <div className="flex flex-col gap-3 w-full">
+                    <p className="text-sm text-slate-600">
+                      Escolha quem vai ser o novo dono. Você continuará como co-dono.
+                    </p>
+                    <select
+                      value={transferSelectedId}
+                      onChange={(e) => setTransferSelectedId(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
+                    >
+                      <option value="">Selecione um membro...</option>
+                      {transferCandidates.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.email}
+                          {m.role === "co-owner" ? " (co-dono)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTransferOpen(false);
+                          setTransferSelectedId("");
+                        }}
+                        disabled={transferLoading}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleTransferOwnership}
+                        disabled={!transferSelectedId || transferLoading}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                      >
+                        {transferLoading && <Loader2 size={12} className="animate-spin" />}
+                        Confirmar transferência
+                      </button>
+                    </div>
+                  </div>
+                ) : confirmDelete ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-600">Tem certeza? Isso é irreversível.</span>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      disabled={actionLoading}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteOrg}
+                      disabled={actionLoading}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
+                    >
+                      {actionLoading && <Loader2 size={12} className="animate-spin" />}
+                      Confirmar exclusão
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTransferOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                    >
+                      <ArrowRightLeft size={13} />
+                      Transferir dono
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 size={13} />
+                      Excluir organização
+                    </button>
+                  </div>
+                )}
+              </>
             ) : confirmLeave ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-600">Tem certeza?</span>
