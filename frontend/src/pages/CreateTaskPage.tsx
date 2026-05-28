@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { PlusCircle, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { PlusCircle, AlertCircle, Loader2, CheckCircle2, ChevronDown, Check } from "lucide-react";
 import { Header } from "../components/Header";
 import { createTask } from "../services/task";
 import { getOrganizations } from "../services/organization";
@@ -29,6 +29,21 @@ export function CreateTaskPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const orgDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node))
+        setTypeDropdownOpen(false);
+      if (orgDropdownRef.current && !orgDropdownRef.current.contains(e.target as Node))
+        setOrgDropdownOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const today = useMemo(() => getTodayDateString(), []);
 
@@ -230,24 +245,43 @@ export function CreateTaskPage() {
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Tipo da tarefa
                   </label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => {
-                      const value = e.target.value as TaskType;
-                      setFormData((prev) => ({
-                        ...prev,
-                        type: value,
-                        organization_id:
-                          value === "organization" ? prev.organization_id : "",
-                      }));
-                      if (error) setError("");
-                      if (success) setSuccess("");
-                    }}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
-                  >
-                    <option value="personal">Pessoal</option>
-                    <option value="organization">Organização</option>
-                  </select>
+                  <div ref={typeDropdownRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setTypeDropdownOpen((prev) => !prev)}
+                      className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 hover:border-slate-300 transition-all"
+                    >
+                      <span>{formData.type === "personal" ? "Pessoal" : "Organização"}</span>
+                      <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${typeDropdownOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {typeDropdownOpen && (
+                      <div className="absolute z-10 mt-1.5 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                        {(["personal", "organization"] as TaskType[]).map((value) => {
+                          const label = value === "personal" ? "Pessoal" : "Organização";
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => {
+                                setTypeDropdownOpen(false);
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  type: value,
+                                  organization_id: value === "organization" ? prev.organization_id : "",
+                                }));
+                                if (error) setError("");
+                                if (success) setSuccess("");
+                              }}
+                              className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                              {label}
+                              {formData.type === value && <Check size={13} className="text-slate-500 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -256,27 +290,44 @@ export function CreateTaskPage() {
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Organização
                   </label>
-                  <select
-                    value={formData.organization_id || ""}
-                    onChange={(e) =>
-                      handleChange("organization_id", e.target.value)
-                    }
-                    disabled={loadingOrganizations}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-60"
-                  >
-                    <option value="">
-                      {loadingOrganizations
-                        ? "Carregando organizações..."
-                        : "Selecione uma organização"}
-                    </option>
-
-                    {organizations.map((org) => (
-                      <option key={org.id} value={org.id}>
-                        {org.name}
-                      </option>
-                    ))}
-                  </select>
-
+                  <div ref={orgDropdownRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => !loadingOrganizations && organizations.length > 0 && setOrgDropdownOpen((prev) => !prev)}
+                      disabled={loadingOrganizations}
+                      className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 hover:border-slate-300 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <span className={formData.organization_id ? "text-slate-800" : "text-slate-400"}>
+                        {loadingOrganizations
+                          ? "Carregando organizações..."
+                          : formData.organization_id
+                          ? organizations.find((o) => o.id === formData.organization_id)?.name ?? "Selecione uma organização"
+                          : "Selecione uma organização"}
+                      </span>
+                      {!loadingOrganizations && organizations.length > 0 && (
+                        <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${orgDropdownOpen ? "rotate-180" : ""}`} />
+                      )}
+                      {loadingOrganizations && <Loader2 size={14} className="animate-spin text-slate-400 shrink-0" />}
+                    </button>
+                    {orgDropdownOpen && (
+                      <div className="absolute z-10 mt-1.5 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                        {organizations.map((org) => (
+                          <button
+                            key={org.id}
+                            type="button"
+                            onClick={() => {
+                              setOrgDropdownOpen(false);
+                              handleChange("organization_id", org.id);
+                            }}
+                            className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            {org.name}
+                            {formData.organization_id === org.id && <Check size={13} className="text-slate-500 shrink-0" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   {!loadingOrganizations && organizations.length === 0 && (
                     <p className="text-sm text-amber-600 mt-2">
                       Você ainda não participa de nenhuma organização.

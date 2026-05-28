@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Header } from "../components/Header";
 import { type Task, type TaskStatus } from "../types/task";
-import { CalendarDays, Building2, Filter, ListTodo, Trash2, Loader2 } from "lucide-react";
+import { CalendarDays, Building2, Filter, ListTodo, Trash2, Loader2, ChevronDown, Check } from "lucide-react";
 import { getMyTasks, updateTaskStatus, deleteTask } from "../services/task";
 
 type StatusFilter = "all" | "to_do" | "doing" | "done";
@@ -26,18 +26,32 @@ interface TaskCardProps {
   onDelete: (taskId: string) => Promise<void>;
 }
 
+const statusDropdownOptions: { value: Task["status"]; label: string; classes: string }[] = [
+  { value: "to_do", label: "A Fazer", classes: "text-amber-700 bg-amber-50 hover:bg-amber-100" },
+  { value: "doing", label: "Fazendo", classes: "text-blue-700 bg-blue-50 hover:bg-blue-100" },
+  { value: "done", label: "Concluído", classes: "text-emerald-700 bg-emerald-50 hover:bg-emerald-100" },
+];
+
 function TaskCard({ task, today, updatingTaskId, onStatusChange, onDelete }: TaskCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isUrgent = task.status !== "done" && task.due_date === today;
   const isOverdue = task.status !== "done" && !!task.due_date && task.due_date < today;
+  const isUpdating = updatingTaskId === task.id;
+  const currentOption = statusDropdownOptions.find((o) => o.value === task.status)!;
 
-  const taskStatusOptions: { value: Task["status"]; label: string }[] = [
-    { value: "to_do", label: "A Fazer" },
-    { value: "doing", label: "Fazendo" },
-    { value: "done", label: "Concluído" },
-  ];
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [dropdownOpen]);
 
   function formatDate(date?: string) {
     if (!date) return "Sem data";
@@ -99,18 +113,41 @@ function TaskCard({ task, today, updatingTaskId, onStatusChange, onDelete }: Tas
         <div className="flex items-center gap-2">
           <div className="flex-1 flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Alterar status</label>
-            <select
-              value={task.status}
-              onChange={(e) => onStatusChange(task.id, e.target.value as Task["status"])}
-              disabled={updatingTaskId === task.id}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {taskStatusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <div ref={dropdownRef} className="relative">
+              <button
+                type="button"
+                onClick={() => !isUpdating && setDropdownOpen((prev) => !prev)}
+                disabled={isUpdating}
+                className="w-full flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition-all hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className={`font-medium ${currentOption.classes.split(" ")[0]}`}>
+                  {currentOption.label}
+                </span>
+                {isUpdating
+                  ? <Loader2 size={14} className="animate-spin text-slate-400 shrink-0" />
+                  : <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+                }
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute z-10 mt-1.5 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                  {statusDropdownOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        if (option.value !== task.status) onStatusChange(task.id, option.value);
+                      }}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium transition-colors ${option.classes}`}
+                    >
+                      {option.label}
+                      {option.value === task.status && <Check size={13} className="shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {confirmDelete ? (
